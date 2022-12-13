@@ -19,5 +19,5 @@ fn main() {
     // day6::run();
     // day7::run();
     // day8::run();
-    day9::run_v2();
+    day9::run();
 }
