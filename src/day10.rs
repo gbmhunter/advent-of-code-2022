@@ -15,32 +15,24 @@ pub fn run() {
     let signal_strength_start_count = 20;
     let signal_strength_period = 40; // Every 40 cycles after the 20th
 
-    while(true) {
-        println!("Starting cycle. cycle_count={}, curr_command_name={}, curr_command_reg_value={}, curr_command_remaining_cycles={}",
-            cycle_count, curr_command_name, curr_command_reg_value, curr_command_remaining_cycles);
-       
+    let mut pixels = String::from("");
 
+    loop {
         if curr_command_remaining_cycles == 0 {
-            println!("Time to read in a new command!");
              // Time to grab another instruction
             let mut line = "";
             match lines.next() {
                 None => {
-                    println!("Run out of commands.");
                     break;
                 },
                 Some(i) => line = i,
             }
-            println!("{}", line);
             if line == "noop" {
-                println!("Found noop");
                 curr_command_name = line;
                 curr_command_remaining_cycles = 1;
             } else if line.starts_with("addx") {
-                println!("Found addx command");
                 let pieces: Vec<&str> = line.split(" ").collect();
                 let add_amount = pieces[1].parse::<i32>().unwrap();
-                println!("add_amount={}", add_amount);
                 curr_command_name = pieces[0];
                 curr_command_reg_value = add_amount;
                 curr_command_remaining_cycles = 2;
@@ -49,13 +41,21 @@ pub fn run() {
 
         // During cycle
         if (cycle_count - signal_strength_start_count) % signal_strength_period == 0 {
-            println!("Time to calculate signal strength.");
             let signal_strength = cycle_count * x_reg_value;
-            println!("signal_strength={}", signal_strength);
             sum_of_signal_strengths += signal_strength;
         }
 
-
+        // Do pixels stuff
+        // Look at current sprite position
+        let pixel_horiz_pos = (cycle_count - 1) % 40;
+        if pixel_horiz_pos >=  x_reg_value - 1 && pixel_horiz_pos <= x_reg_value + 1 {
+            pixels += "#";
+        } else {
+            pixels += ".";
+        }
+        if pixel_horiz_pos == 39 {
+            pixels += "\n";
+        }
 
         if curr_command_remaining_cycles > 0 {
             curr_command_remaining_cycles -= 1;
@@ -65,10 +65,10 @@ pub fn run() {
             // Command has reached the end of it's running time
             if curr_command_name == "addx" {
                 x_reg_value += curr_command_reg_value;
-                println!("Update value of reg X to {} (end of cycle {})", x_reg_value, cycle_count);
             }
         }
         cycle_count += 1;
     }
-    println!("Sum of signal strengths = {}", sum_of_signal_strengths);
+    println!("part 1: Sum of signal strengths = {}", sum_of_signal_strengths);
+    println!("part 2: Pixels = \n{}", pixels);
 }
