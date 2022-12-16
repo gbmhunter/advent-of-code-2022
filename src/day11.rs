@@ -2,13 +2,14 @@ use std::fs;
 
 use evalexpr::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Monkey {
-    items: Vec<i32>,
-    operation: String,
-    test_divisible_by: i32,
-    test_true_monkey_num: i32,
-    test_false_monkey_num: i32,
+    items: Vec<i64>,
+    operation: Node,
+    test_divisible_by: i64,
+    test_true_monkey_num: i64,
+    test_false_monkey_num: i64,
+    num_items_inspected: i64,
 }
 
 pub fn run() {
@@ -21,30 +22,27 @@ pub fn run() {
     let mut monkeys: Vec<Monkey> = Vec::new();
     while curr_line < lines.len() {
         // Parse monkey
-        println!("Parsing monkey {}", monkeys.len());
-
         let starting_line = &lines[curr_line + 1][17..];
-        println!("starting={}", starting_line);
         let pieces: Vec<&str> = starting_line.split(",").collect();
-        let mut items: Vec<i32> = Vec::new();
+        let mut items: Vec<i64> = Vec::new();
         for piece in pieces {
-            items.push(piece.trim().parse::<i32>().unwrap());
+            items.push(piece.trim().parse::<i64>().unwrap());
         }
 
         // Operation
-
         // Don't include the "new =", as we want a valid "expression" for the parsing library 
-        let operation = lines[curr_line + 2][19..].to_string();
-        println!("operation={}", operation);
+        let operation_str = lines[curr_line + 2][19..].to_string();
+        // Pre compile to make it faster later
+        let operation = build_operator_tree(&operation_str).unwrap();
 
         // Test
         let test_divisible_by_str = &lines[curr_line + 3][21..];
-        println!("test_divisible_by_str={}", test_divisible_by_str);
-        let test_divisible_by = test_divisible_by_str.parse::<i32>().unwrap();
-        let test_true_monkey_num = lines[curr_line + 4][29..].parse::<i32>().unwrap();
-        let test_false_monkey_num = lines[curr_line + 5][30..].parse::<i32>().unwrap();
-        println!("test_true_monkey_num={}", test_true_monkey_num);
-        println!("test_false_monkey_num={}", test_false_monkey_num);
+        let test_divisible_by = test_divisible_by_str.parse::<i64>().unwrap();
+        let test_true_monkey_num = lines[curr_line + 4][29..].parse::<i64>().unwrap();
+        let test_false_monkey_num = lines[curr_line + 5][30..].parse::<i64>().unwrap();
+
+        // Start with no items inspected, this gets incremented as we go
+        let num_items_inspected = 0;
 
         let monkey = Monkey {
             items,
@@ -52,6 +50,7 @@ pub fn run() {
             test_divisible_by,
             test_true_monkey_num,
             test_false_monkey_num,
+            num_items_inspected,
         };
 
         monkeys.push(monkey);
@@ -60,30 +59,92 @@ pub fn run() {
         curr_line += 7;
     }
 
-    println!("Parsing monkeys finished. monkeys={:#?}", monkeys);
+    part1(monkeys.clone());
+    part2(monkeys.clone());
+}
 
-    for round_idx in 0..1 {
-        println!("Starting round {}", round_idx);
-        for monkey in &monkeys {
+fn part1(mut monkeys: Vec<Monkey>) {
+
+    for _ in 0..20 {
+        for i in 0..monkeys.len() {
+            // This is get around the issue of mutably borrowing more than one monkey at the same time
+            let monkey = monkeys[i].clone();
             // Inspect items
-            for item in &monkey.items {
-                println!("item = {}", item);
 
-                let num = *item as i64;
+            while monkeys[i].items.len() > 0 {
+                let item = monkeys[i].items.remove(0);
+                let num = item as i64;
                 let context = context_map! {
                     "old" => num,
                 }.unwrap();
-                let mut new_worry_level = eval_with_context(monkey.operation.as_str(), &context).unwrap().as_int().unwrap() as i32;
+                let mut new_worry_level = monkey.operation.eval_with_context(&context).unwrap().as_int().unwrap() as i64;
                 // Divide by 3 and round down
                 new_worry_level = new_worry_level / 3;
-                println!("Result = {}", new_worry_level);
                 // Test if divisible
                 if new_worry_level % monkey.test_divisible_by == 0 {
-                    println!("Test was TRUE.")
+                    monkeys[monkey.test_true_monkey_num as usize].items.push(new_worry_level);
                 } else {
-                    println!("Test was FALSE.")
+                    monkeys[monkey.test_false_monkey_num as usize].items.push(new_worry_level);
                 }
+                // Finished inpecting an item, keep track of the total items inspected per monkey
+                monkeys[i].num_items_inspected += 1;
             }
         }
     }
+
+    let mut num_items_inspected = monkeys.iter().map(|x| x.num_items_inspected).collect::<Vec<_>>();
+    num_items_inspected.sort();
+    num_items_inspected.reverse();
+    let monkey_business = num_items_inspected[0] * num_items_inspected[1];
+    println!("part 1: monkey business = {:?}", monkey_business);
+    
+}
+
+fn part2(mut monkeys: Vec<Monkey>) {
+
+    let mut product_of_all_divisors = 1;
+    for monkey in &monkeys {
+        product_of_all_divisors *= monkey.test_divisible_by;
+    }
+
+    for round_idx in 0..10000 {
+        if round_idx % 1000 == 0 {
+            println!("Starting round {}", round_idx);
+        }
+        for i in 0..monkeys.len() {
+            // This is get around the issue of mutably borrowing more than one monkey at the same time
+            let monkey = monkeys[i].clone();
+            // Inspect items
+            while monkeys[i].items.len() > 0 {
+                let item = monkeys[i].items.remove(0);
+
+                let num = item as i64;
+                let context = context_map! {
+                    "old" => num,
+                }.unwrap();
+                let mut new_worry_level = monkey.operation.eval_with_context(&context).unwrap().as_int().unwrap() as i64;
+                // Divide by 3 and round down
+                // new_worry_level = new_worry_level / 3;
+
+                // Keep worry level from getting too big
+                new_worry_level = new_worry_level % product_of_all_divisors;
+
+                // Test if divisible
+                if new_worry_level % monkey.test_divisible_by == 0 {
+                    monkeys[monkey.test_true_monkey_num as usize].items.push(new_worry_level);
+                } else {
+                    monkeys[monkey.test_false_monkey_num as usize].items.push(new_worry_level);
+                }
+                // Finished inpecting an item, keep track of the total items inspected per monkey
+                monkeys[i].num_items_inspected += 1;
+            }
+        }
+    }
+
+    let mut num_items_inspected = monkeys.iter().map(|x| x.num_items_inspected).collect::<Vec<_>>();
+    num_items_inspected.sort();
+    num_items_inspected.reverse();
+    let monkey_business = num_items_inspected[0] * num_items_inspected[1];
+    println!("part 2: monkey business = {:?}", monkey_business);
+    
 }

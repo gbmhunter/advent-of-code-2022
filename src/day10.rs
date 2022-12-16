@@ -20,7 +20,7 @@ pub fn run() {
     loop {
         if curr_command_remaining_cycles == 0 {
              // Time to grab another instruction
-            let mut line = "";
+            let line;
             match lines.next() {
                 None => {
                     break;
