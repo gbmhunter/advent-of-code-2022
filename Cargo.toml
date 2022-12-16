@@ -8,3 +8,4 @@ edition = "2021"
 
 [dependencies]
 evalexpr = "8.1.0"
+pathfinding = "4.1.1"
