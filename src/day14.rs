@@ -39,6 +39,29 @@ pub fn run() {
         }
     }
     print_map(&map);
+
+    // Find maximum y value for any rock
+    let mut max_y = 0;
+    for x in 0..map.len() {
+        for y in 0..map[0].len() {
+            if map[x][y] == PixelTypes::Rock && y > max_y {
+                max_y = y;
+            }
+        }
+    }
+    println!("max_y={}", max_y);
+
+    // Now insert and move sand
+    let mut sand_stopped = true;
+    let mut num_sand_particles = 0;
+    while sand_stopped {
+        sand_stopped = move_sand(&mut map, max_y);
+        num_sand_particles += 1;
+    }
+    num_sand_particles -= 1; // Subtract 1 off since we detect the first that falls forever
+    print_map(&map);
+    assert!(num_sand_particles == 1068, "Incorrect answer.");
+    println!("part 1: num. sand units = {}", num_sand_particles);
 }
 
 fn draw_line(map: &mut Vec<Vec<PixelTypes>>, from: &Coord, to: &Coord) {
@@ -61,9 +84,13 @@ fn draw_line(map: &mut Vec<Vec<PixelTypes>>, from: &Coord, to: &Coord) {
     }
 }
 
-fn produce_sand(map: &mut Vec<Vec<PixelTypes>>) {
+fn move_sand(map: &mut Vec<Vec<PixelTypes>>, max_y: usize) -> bool {
     let mut sand_location = SAND_POINT;
     loop {
+        if sand_location.1 + 1 > max_y {
+            // Sand has exceeded max y bounds
+            return false;
+        }
         if map[sand_location.0][sand_location.1 + 1] == PixelTypes::Nothing {
             sand_location = Coord(sand_location.0, sand_location.1 + 1);
         } else if map[sand_location.0 - 1][sand_location.1 + 1] == PixelTypes::Nothing {
@@ -73,7 +100,7 @@ fn produce_sand(map: &mut Vec<Vec<PixelTypes>>) {
         } else {
             println!("Sand has come to a rest!");
             map[sand_location.0][sand_location.1] = PixelTypes::Sand;
-            return;
+            return true;
         }
     }
 }
