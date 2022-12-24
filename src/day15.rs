@@ -66,98 +66,117 @@ pub fn run() {
         };
         sensors.push(sensor);
     }
-    // println!("sensors={:?}", sensors);
     // Work out what range of x values we need to scan
     let min_x = sensors.iter().map(|sensor| {
         let min_x = sensor.location.x - sensor.manhatten;
         return min_x;
     }).min().unwrap();
-    println!("min_x={}", min_x);
     let max_x = sensors.iter().map(|sensor| {
         let max_x = sensor.location.x + sensor.manhatten;
         return max_x;
     }).max().unwrap();
-    println!("max_x={}", max_x);
 
-    // let mut num_pos_beacon_cannot_be = 0;
-    // for x in min_x..max_x {
-    //     let current_coord = Coord{x: x, y: row_to_scan_y};
-    //     // println!("Testing point {:?}", current_coord);
-    //     let mut in_exclusion_zone = false;
-    //     let mut known_sensor_or_beacon_is_here = false;
-    //     // At each point, test if we are in the exclusion zone of any sensor
-    //     for sensor in &sensors {
-    //         // println!("Looking as sensor {:?}", sensor);
-    //         if current_coord == sensor.location || current_coord == sensor.closest_beacon {
-    //             // Bail, since there is a known sensor or beacon at this point there can't
-    //             // possibly be another beacon, not counted
-    //             // println!("Known sensor or beacon is here!.");
-    //             known_sensor_or_beacon_is_here = true;
-    //             break;
-    //         }
-    //         if (current_coord - sensor.location).manhattan() <= sensor.manhatten {
-    //             // We are in exclusion zone
-    //             // println!("{:?} is in exclusion zone.", current_coord);
-    //             in_exclusion_zone = true;
-    //         }
-    //     }
-    //     if in_exclusion_zone && !known_sensor_or_beacon_is_here {
-    //         // println!("{:?} is in exclusion zone and no known sensor or beacon is here.", current_coord);
-    //         num_pos_beacon_cannot_be += 1;
-    //     }
-    // }
-    // assert!(num_pos_beacon_cannot_be == 5100463, "Incorrect answer.");
-    // println!("part 1: num. of positions beacon cannot be = {}", num_pos_beacon_cannot_be);
+    let mut num_pos_beacon_cannot_be = 0;
+    for x in min_x..max_x {
+        let current_coord = Coord{x: x, y: row_to_scan_y};
+        // println!("Testing point {:?}", current_coord);
+        let mut in_exclusion_zone = false;
+        let mut known_sensor_or_beacon_is_here = false;
+        // At each point, test if we are in the exclusion zone of any sensor
+        for sensor in &sensors {
+            // println!("Looking as sensor {:?}", sensor);
+            if current_coord == sensor.location || current_coord == sensor.closest_beacon {
+                // Bail, since there is a known sensor or beacon at this point there can't
+                // possibly be another beacon, not counted
+                // println!("Known sensor or beacon is here!.");
+                known_sensor_or_beacon_is_here = true;
+                break;
+            }
+            if (current_coord - sensor.location).manhattan() <= sensor.manhatten {
+                // We are in exclusion zone
+                // println!("{:?} is in exclusion zone.", current_coord);
+                in_exclusion_zone = true;
+            }
+        }
+        if in_exclusion_zone && !known_sensor_or_beacon_is_here {
+            // println!("{:?} is in exclusion zone and no known sensor or beacon is here.", current_coord);
+            num_pos_beacon_cannot_be += 1;
+        }
+    }
+    assert!(num_pos_beacon_cannot_be == 5100463, "Incorrect answer.");
+    println!("part 1: num. of positions beacon cannot be = {}", num_pos_beacon_cannot_be);
 
     // PART 2
     
     let beacon_location = part2_find_beacon(&sensors);
-    // assert!(num_pos_beacon_cannot_be == 5100463, "Incorrect answer.");
-    println!("part 2: {:?}", beacon_location);
+    let tuning_frequency = (beacon_location.x as u64*4000000) + beacon_location.y as u64;
+    assert!(tuning_frequency == 11557863040754, "Incorrect answer.");
+    println!("part 2: tuning frequency = {}", tuning_frequency);
 
 }
 
-fn part2_find_beacon(sensors: &Vec<Sensor>) -> Coord {
-    let min_xy = 0;
-    let max_xy = 4_000_000;
+const PART2_MIN_XY: i32 = 0;
+const PART2_MAX_XY: i32 = 4_000_000;
 
-    for y in min_xy..max_xy {
-        println!("Looking at row {}/{}", y, max_xy);
-        let mut x = min_xy;
-        while x <= max_xy {
-            let current_coord = Coord{x: x, y: y};
-            // println!("Testing point {:?}", current_coord);
-            let mut in_exclusion_zone = false;
-            let mut known_sensor_or_beacon_is_here = false;
-            // At each point, test if we are in the exclusion zone of any sensor
-            for sensor in sensors {
-                // println!("Looking as sensor {:?}", sensor);
-                if current_coord == sensor.location || current_coord == sensor.closest_beacon {
-                    // Bail, since there is a known sensor or beacon at this point there can't
-                    // possibly be another beacon, not counted
-                    // println!("Known sensor or beacon is here!.");
-                    known_sensor_or_beacon_is_here = true;
-                    break;
-                }
-                if (current_coord - sensor.location).manhattan() <= sensor.manhatten {
-                    // We are in exclusion zone, beacon cannot be here
-                    in_exclusion_zone = true;
-                    // We can skip some x's here.
-                    if sensor.location.x - current_coord.x > 0 {
-                        // We are "before" the sensor in the x direction, therefore can 
-                        // skip to the same x distance away but "after" the sensor
-                        x += (sensor.location.x - current_coord.x)*2;
-                    }
-                    break;
-                }
+fn part2_find_beacon(sensors: &Vec<Sensor>) -> Coord {
+
+    // Scan around exclusion zone borders
+    for sensor in sensors {
+        // Start at top, go clockwise
+        let check_radius = sensor.manhatten + 1;
+        let start_loc = Coord{x: sensor.location.x, y: sensor.location.y - check_radius};
+        let mut x_dir = 1;
+        let mut y_dir = 1;
+
+        let mut curr_loc = start_loc;
+        loop {
+            // Check current location
+            if part2_check_location(curr_loc, sensors) {
+                return curr_loc;
             }
-            if !in_exclusion_zone && !known_sensor_or_beacon_is_here {
-                // println!("{:?} is in exclusion zone and no known sensor or beacon is here.", current_coord);
-                return current_coord;
+
+            // Advance current location
+            curr_loc.x += x_dir;
+            curr_loc.y += y_dir;
+            if curr_loc == (Coord{x: sensor.location.x + check_radius, y: sensor.location.y}) {
+                // Hit right corner
+                x_dir = -1;
+            } else if curr_loc == (Coord{x: sensor.location.x, y: sensor.location.y + check_radius}) {
+                // Hit bottom corner
+                y_dir = -1;
+            } else if curr_loc == (Coord{x: sensor.location.x - check_radius, y: sensor.location.y}) {
+                // Hit left corner
+                x_dir = 1;
+            } else if curr_loc == (Coord{x: sensor.location.x, y: sensor.location.y - check_radius}) {
+                // Hit top corner (start), we have finished scanning this border now
+                break;
             }
-            x += 1;
         }
+
     }
 
     panic!("Did not find beacon!");
+}
+
+fn part2_check_location(curr_loc: Coord, sensors: &Vec<Sensor>) -> bool {
+
+    // At each point, test if we are in the exclusion zone of any sensor
+    for sensor in sensors {
+        // println!("Looking as sensor {:?}", sensor);
+        if curr_loc.x < PART2_MIN_XY || curr_loc.x > PART2_MAX_XY || curr_loc.y < PART2_MIN_XY || curr_loc.y > PART2_MAX_XY {
+            return false;
+        }
+        if curr_loc == sensor.location || curr_loc == sensor.closest_beacon {
+            // Bail, since there is a known sensor or beacon at this point there can't
+            // possibly be another beacon, not counted
+            return false;
+        }
+        if (curr_loc - sensor.location).manhattan() <= sensor.manhatten {
+            // We are in exclusion zone
+            return false;
+        }
+    }
+    // If we get here, current location was not in any exclusion zones, so must
+    // be correct point!
+    return true;
 }
