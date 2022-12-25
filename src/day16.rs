@@ -35,6 +35,16 @@ pub fn run() {
 
     println!("data={:?}", room_data);
 
+    // Filter out rooms that have 0 flow rate
+    let positive_flow_room_names: HashSet<_> = room_data.iter().filter(| (room_name, valve) | {
+            valve.flow_rate > 0
+        })
+        .map(| (room_name, valve) | {
+            room_name
+        }).collect();
+    println!("positive_flow_room_names={:?}", positive_flow_room_names);
+    
+
     // Need to find shortest paths between all rooms
     // assert!(find_min_cost("AA", "CC", &room_data) == 2);
     // assert!(find_min_cost("AA", "DD", &room_data) == 1);
@@ -47,6 +57,28 @@ pub fn run() {
         elapsed_time: 0,
         total_relieved_pressure: 0,
     });
+
+    while let Some(State { 
+        curr_room,
+        opened,
+        elapsed_time,
+        total_relieved_pressure }) = states.pop_front() {
+        println!("Found state. curr_room={}", curr_room);
+
+        // Go from this room to all rooms which still have vavles closed and
+        // flow rate > 0
+        let unopened_pos_flow_room_names: Vec<_> = positive_flow_room_names.iter().filter(| room_name | {
+            !opened.contains(**room_name)
+        }).collect();
+        println!("unopened_pos_flow_room_names={:?}", unopened_pos_flow_room_names);
+        for room_name in unopened_pos_flow_room_names {
+            // We have not opened the valve in this room
+            // states.push_back(State {
+            //     curr_room: &room_name,
+            //     opened: opened.clone()
+            // })
+        }
+    }
     
 
 
