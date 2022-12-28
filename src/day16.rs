@@ -65,15 +65,52 @@ pub fn run() {
     // Keeps track of the max. pressure released from any state
     let mut max_pressure_released = 0u32;
 
+    let debug_valve_order: Vec<&str> = vec!["DD", "BB", "JJ", "HH", "EE", "CC" ];
+
+    let mut count = 0;
     while let Some(curr_state) = states.pop_front() {
-        println!("Processing state. curr_state={:?}", curr_state);
+        if count == 1000 {
+            println!("Processing state. curr_state={:?}", curr_state);
+            println!("Queue length = {}", states.len());
+            println!("Max released pressure = {}", max_pressure_released);
+            count = 0;
+        }
+        count += 1;
 
         // Go from this room to all rooms which still have vavles closed and
         // flow rate > 0
         let unopened_pos_flow_room_names: Vec<_> = positive_flow_room_names.iter().filter(| room_name | {
             !curr_state.opened.contains(**room_name)
         }).collect();
-        println!("unopened_pos_flow_room_names={:?}", unopened_pos_flow_room_names);
+        // println!("unopened_pos_flow_room_names={:?}", unopened_pos_flow_room_names);
+
+        // If the remaining rooms were all opened in the 
+        // let total_remaining_flow_rate: u32 = unopened_pos_flow_room_names.iter().map(| &room_name | {
+        //     room_data[*room_name].flow_rate
+        // }).sum();
+        // let pot_max = curr_state.total_relieved_pressure + total_remaining_flow_rate * (30 - curr_state.elapsed_time);
+        let mut flow_rates: Vec<u32> = unopened_pos_flow_room_names.iter().map(| &room_name | {
+            room_data[*room_name].flow_rate
+        }).collect();
+        flow_rates.sort(); // Highest flow rates will be last
+        let mut relieved_pressure = curr_state.total_relieved_pressure;
+        let mut pressure_per_min = curr_state.pressure_per_min;
+        let mut time_spent = curr_state.elapsed_time;
+        loop {
+            time_spent += 2; // Assume it takes only 1min to move to room, and of course 1 min. to open
+            if time_spent >= 30 {
+                break;
+            }
+            relieved_pressure += 2*pressure_per_min;
+            match flow_rates.pop() { // Get next highest value
+                Some(i) => pressure_per_min += i,
+                None => break,
+            }
+        }
+        if relieved_pressure < max_pressure_released {
+            // println!("Current state cannot possibly lead to something which beats the max, abondoning state.");
+            continue;
+        }
 
         // Add new states based on unopened valve rooms we could travel to.
         // 1 new state for every room we could visit
@@ -92,7 +129,7 @@ pub fn run() {
             if new_elapsed_time > 30 {
                 // This new state exceeds the total run time, so it's not a valid state, skip
                 // to next possible state
-                println!("New state would exceed max. time, not creating.");
+                // println!("New state would exceed max. time, not creating.");
                 continue;
             }
 
@@ -104,14 +141,14 @@ pub fn run() {
                 total_relieved_pressure: new_total_relieved_pressure,
                 pressure_per_min: new_pressure_per_min,
             };
-            println!("Created new state, which will be pushed onto back of states vector. state={:?}", new_state);
+            // println!("Created new state, which will be pushed onto back of states vector. state={:?}", new_state);
             states.push_back(new_state);
         }
 
         // Now let this current state expire to the end of the 30mins, finding the total relieved pressure
         let remaining_time = 30 - curr_state.elapsed_time;
         let total_relieved_pressure = curr_state.total_relieved_pressure + remaining_time*curr_state.pressure_per_min;
-        println!("Let current state run to 30mins. total_released_pressure={}", total_relieved_pressure);
+        // println!("Let current state run to 30mins. total_released_pressure={}", total_relieved_pressure);
         if total_relieved_pressure > max_pressure_released {
             // We've found a new max!
             max_pressure_released = total_relieved_pressure;
@@ -119,8 +156,19 @@ pub fn run() {
 
     }
     
+    assert!(max_pressure_released == 2080, "Incorrect answer.");
+    println!("part 1: max released pressure = {}", max_pressure_released);
 
 
+}
+
+fn check_debug(curr_valve_order: &Vec<String>, debug_valve_order: &Vec<&str>) -> bool {
+    for i in 0..curr_valve_order.len() {
+        if curr_valve_order[i] != debug_valve_order[i] {
+            return false;
+        }
+    }
+    return true;
 }
 
 #[derive(PartialEq, Eq)]
