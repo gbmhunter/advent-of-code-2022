@@ -9,12 +9,15 @@ struct Valve {
     neighbours: HashSet<String>,
 }
 
-
+#[derive(Debug)]
 struct State<'a> {
     curr_room: &'a str,
     opened: HashSet<String>,
     elapsed_time: u32,
     total_relieved_pressure: u32,
+    // Rather than calculating this each time from the opened valves, it'll be quicker to keep track
+    // of the cululmative sum of all opened valves
+    pressure_per_min: u32,
 }
 
 pub fn run() {
@@ -56,28 +59,64 @@ pub fn run() {
         opened: HashSet::new(),
         elapsed_time: 0,
         total_relieved_pressure: 0,
+        pressure_per_min: 0,
     });
 
-    while let Some(State { 
-        curr_room,
-        opened,
-        elapsed_time,
-        total_relieved_pressure }) = states.pop_front() {
-        println!("Found state. curr_room={}", curr_room);
+    // Keeps track of the max. pressure released from any state
+    let mut max_pressure_released = 0u32;
+
+    while let Some(curr_state) = states.pop_front() {
+        println!("Processing state. curr_state={:?}", curr_state);
 
         // Go from this room to all rooms which still have vavles closed and
         // flow rate > 0
         let unopened_pos_flow_room_names: Vec<_> = positive_flow_room_names.iter().filter(| room_name | {
-            !opened.contains(**room_name)
+            !curr_state.opened.contains(**room_name)
         }).collect();
         println!("unopened_pos_flow_room_names={:?}", unopened_pos_flow_room_names);
-        for room_name in unopened_pos_flow_room_names {
+
+        // Add new states based on unopened valve rooms we could travel to.
+        // 1 new state for every room we could visit
+        for next_room_name in unopened_pos_flow_room_names {
             // We have not opened the valve in this room
-            // states.push_back(State {
-            //     curr_room: &room_name,
-            //     opened: opened.clone()
-            // })
+            let mut opened_new_state = curr_state.opened.clone();
+            let travel_time = find_min_cost(curr_state.curr_room, &next_room_name, &room_data);
+            // Record that this valve in the next room is now open
+            opened_new_state.insert(next_room_name.to_string());
+            let new_total_relieved_pressure = curr_state.total_relieved_pressure + (travel_time + 1)*curr_state.pressure_per_min;
+            // Increment the new pressure_per_min based on how much more opening this new rooms valve will do
+            let new_pressure_per_min = curr_state.pressure_per_min + room_data[*next_room_name].flow_rate;
+
+            let new_elapsed_time = curr_state.elapsed_time + travel_time + 1;
+
+            if new_elapsed_time > 30 {
+                // This new state exceeds the total run time, so it's not a valid state, skip
+                // to next possible state
+                println!("New state would exceed max. time, not creating.");
+                continue;
+            }
+
+            // Create new state
+            let new_state = State {
+                curr_room: &next_room_name,
+                opened: opened_new_state,
+                elapsed_time: curr_state.elapsed_time + travel_time + 1, // Add one for opening valve once we get there
+                total_relieved_pressure: new_total_relieved_pressure,
+                pressure_per_min: new_pressure_per_min,
+            };
+            println!("Created new state, which will be pushed onto back of states vector. state={:?}", new_state);
+            states.push_back(new_state);
         }
+
+        // Now let this current state expire to the end of the 30mins, finding the total relieved pressure
+        let remaining_time = 30 - curr_state.elapsed_time;
+        let total_relieved_pressure = curr_state.total_relieved_pressure + remaining_time*curr_state.pressure_per_min;
+        println!("Let current state run to 30mins. total_released_pressure={}", total_relieved_pressure);
+        if total_relieved_pressure > max_pressure_released {
+            // We've found a new max!
+            max_pressure_released = total_relieved_pressure;
+        }
+
     }
     
 
