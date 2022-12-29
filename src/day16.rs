@@ -1,7 +1,8 @@
 use std::fs;
-use std::collections::{HashSet, HashMap, BinaryHeap, VecDeque};
+use std::collections::{HashSet, HashMap, BinaryHeap, VecDeque, BTreeSet};
 
 use regex::Regex;
+use itertools::Itertools;
 
 #[derive(Debug)]
 struct Valve {
@@ -12,7 +13,7 @@ struct Valve {
 #[derive(Debug)]
 struct State<'a> {
     curr_room: &'a str,
-    opened: HashSet<String>,
+    opened: BTreeSet<String>,
     elapsed_time: u32,
     total_relieved_pressure: u32,
     // Rather than calculating this each time from the opened valves, it'll be quicker to keep track
@@ -46,7 +47,12 @@ pub fn run() {
             room_name
         }).collect();
     println!("positive_flow_room_names={:?}", positive_flow_room_names);
+
+    part1(&room_data, &positive_flow_room_names);
+    part2(&room_data, &positive_flow_room_names);
+}
     
+fn part1(room_data: &HashMap<String, Valve>, positive_flow_room_names: &HashSet<&String>) {
 
     // Need to find shortest paths between all rooms
     // assert!(find_min_cost("AA", "CC", &room_data) == 2);
@@ -56,7 +62,7 @@ pub fn run() {
     // Initial state, start at "AA", with all valves closed, 0 elapsed time and pressure
     states.push_back(State {
         curr_room: "AA",
-        opened: HashSet::new(),
+        opened: BTreeSet::new(),
         elapsed_time: 0,
         total_relieved_pressure: 0,
         pressure_per_min: 0,
@@ -79,8 +85,8 @@ pub fn run() {
 
         // Go from this room to all rooms which still have vavles closed and
         // flow rate > 0
-        let unopened_pos_flow_room_names: Vec<_> = positive_flow_room_names.iter().filter(| room_name | {
-            !curr_state.opened.contains(**room_name)
+        let unopened_pos_flow_room_names: Vec<_> = positive_flow_room_names.iter().filter(| &room_name | {
+            !curr_state.opened.contains(*room_name)
         }).collect();
         // println!("unopened_pos_flow_room_names={:?}", unopened_pos_flow_room_names);
 
@@ -158,6 +164,96 @@ pub fn run() {
     
     assert!(max_pressure_released == 2080, "Incorrect answer.");
     println!("part 1: max released pressure = {}", max_pressure_released);
+
+
+}
+
+fn part2(room_data: &HashMap<String, Valve>, positive_flow_room_names: &HashSet<&String>) {
+
+    let run_time_mins = 26;
+    let mut states = VecDeque::new();
+
+    // Initial state, start at "AA", with all valves closed, 0 elapsed time and pressure
+    states.push_back(State {
+        curr_room: "AA",
+        opened: BTreeSet::new(),
+        elapsed_time: 0,
+        total_relieved_pressure: 0,
+        pressure_per_min: 0,
+    });
+
+    let mut max_pressure_relieved_by_open_valves: HashMap<BTreeSet<String>, u32> = HashMap::new();
+
+    let mut count = 0;
+    while let Some(curr_state) = states.pop_front() {
+        if count == 1000 {
+            println!("Processing state. curr_state={:?}", curr_state);
+            println!("Queue length = {}", states.len());
+            count = 0;
+        }
+        count += 1;
+
+        // Go from this room to all rooms which still have vavles closed and
+        // flow rate > 0
+        let unopened_pos_flow_room_names: Vec<_> = positive_flow_room_names.iter().filter(| &room_name | {
+            !curr_state.opened.contains(*room_name)
+        }).collect();
+        // println!("unopened_pos_flow_room_names={:?}", unopened_pos_flow_room_names);
+
+        // Add new states based on unopened valve rooms we could travel to.
+        // 1 new state for every room we could visit
+        for next_room_name in unopened_pos_flow_room_names {
+            // We have not opened the valve in this room
+            let mut opened_new_state = curr_state.opened.clone();
+            let travel_time = find_min_cost(curr_state.curr_room, &next_room_name, &room_data);
+            // Record that this valve in the next room is now open
+            opened_new_state.insert(next_room_name.to_string());
+            let new_total_relieved_pressure = curr_state.total_relieved_pressure + (travel_time + 1)*curr_state.pressure_per_min;
+            // Increment the new pressure_per_min based on how much more opening this new rooms valve will do
+            let new_pressure_per_min = curr_state.pressure_per_min + room_data[*next_room_name].flow_rate;
+
+            let new_elapsed_time = curr_state.elapsed_time + travel_time + 1;
+
+            if new_elapsed_time > run_time_mins {
+                // This new state exceeds the total run time, so it's not a valid state, skip
+                // to next possible state
+                // println!("New state would exceed max. time, not creating.");
+                continue;
+            }
+
+            // Create new state
+            let new_state = State {
+                curr_room: &next_room_name,
+                opened: opened_new_state,
+                elapsed_time: curr_state.elapsed_time + travel_time + 1, // Add one for opening valve once we get there
+                total_relieved_pressure: new_total_relieved_pressure,
+                pressure_per_min: new_pressure_per_min,
+            };
+            // println!("Created new state, which will be pushed onto back of states vector. state={:?}", new_state);
+            states.push_back(new_state);
+        }
+
+        // Now let this current state expire to the end of the run time, finding the total relieved pressure
+        let remaining_time = run_time_mins - curr_state.elapsed_time;
+        let total_relieved_pressure = curr_state.total_relieved_pressure + remaining_time*curr_state.pressure_per_min;
+
+        // Save max pressure relieved by this open valve combo
+        max_pressure_relieved_by_open_valves
+            .entry(curr_state.opened.clone())
+            .and_modify(| relieved_pressure | { *relieved_pressure = (*relieved_pressure).max(total_relieved_pressure) })
+            .or_insert(total_relieved_pressure);
+    }
+
+    let max_pressure_released = max_pressure_relieved_by_open_valves
+        .iter()
+        .tuple_combinations()
+        .filter(| (human, elephant) | human.0.is_disjoint(elephant.0))
+        .map(| (human, elephant) | human.1 + elephant.1)
+        .max()
+        .unwrap();
+    
+    assert!(max_pressure_released == 2752, "Incorrect answer.");
+    println!("part 2: max released pressure = {}", max_pressure_released);
 
 
 }
