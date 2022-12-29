@@ -38,6 +38,10 @@ pub fn run() {
     println!("rock_shapes={:#?}", rock_shapes);
 
     // Map height is added to dynamically as needed
+    // map[y][x]
+    // y
+    // |
+    // O--x
     let mut map: Vec<Vec<char>> = Vec::new();
 
     let map_width = 7;
@@ -49,6 +53,15 @@ pub fn run() {
 
     loop {
         // Insert rock
+        // Find highest rock row
+        let mut highest_rock_row = 0;
+        for row in map.iter() {
+            if ! row.contains(&'#') {
+                break;
+            }
+            highest_rock_row += 1;
+        }
+        println!("highest_rock_row={}", highest_rock_row);
         map.push(vec!['.'; map_width]);
         print_map(&map);
         break;
