@@ -55,22 +55,38 @@ pub fn run() {
     let mut rock_index_to_insert = 0;
     let mut jet_index = 0;
 
+    // INSERT ROCK
+    insert_new_rock(&mut map, &rock_shapes[rock_index_to_insert]);
+    // Increment to next rock for next insertion
+    rock_index_to_insert = (rock_index_to_insert + 1)%rock_shapes.len();
+    println!("Rock inserted. map=");
+    print_map(&map);
+
+    let mut debug_count = 0;
+
     loop {
-        // INSERT ROCK
-        insert_new_rock(&mut map, &rock_shapes[rock_index_to_insert]);
-        // Increment to next rock for next insertion
-        rock_index_to_insert = (rock_index_to_insert + 1)%rock_shapes.len();
-        
+
         // JET ROCK SIDE TO SIDE
         if jet_directions[jet_index..jet_index+1] == *"<" {
             // Go left
+            move_rock(&mut map, Direction::Left);
         } else {
             // Go right
+            move_rock(&mut map, Direction::Right);
         }
+        println!("Finished jetting with {}. map=", &jet_directions[jet_index..jet_index+1]);
+        print_map(&map);
         jet_index = (jet_index + 1) % jet_directions.len();
 
+        // MOVE ROCK DOWN
+        move_rock(&mut map, Direction::Down);
+        println!("Finished moving rock down. map=");
         print_map(&map);
-        break;
+
+        if debug_count == 3 {
+            break;
+        }
+        debug_count += 1;
     }
 
 
@@ -107,6 +123,7 @@ fn insert_new_rock(map: &mut Vec<Vec<char>>, rock_to_insert: &Vec<Vec<char>>) {
     }
 }
 
+#[derive(PartialEq, Debug)]
 enum Direction {
     Left,
     Right,
@@ -115,10 +132,61 @@ enum Direction {
 }
 
 fn move_rock(map: &mut Vec<Vec<char>>, direction: Direction) -> bool {
-    // Make sure move is legal
-    if direction == Direction::Left {
-        let y_iter = map.iter();
+    println!("move_rock() called. direction={:?}", direction);
+    let mut delta_x: isize = 0;
+    let mut delta_y: isize = 0;
+    let mut x_iter: Vec<usize>;
+    let mut y_iter: Vec<usize>;
+    match direction {
+        Direction::Left => { delta_x = -1; delta_y = 0; x_iter = (0..map[0].len()).collect(); y_iter = (0..map.len()).collect(); },
+        Direction::Right => { delta_x = 1; delta_y = 0; x_iter = (0..map[0].len()).rev().collect(); y_iter = (0..map.len()).collect(); },
+        Direction::Up => { delta_x = 0; delta_y = 1; x_iter = (0..map[0].len()).collect(); y_iter = (0..map.len()).rev().collect(); },
+        Direction::Down => { delta_x = 0; delta_y = -1; x_iter = (0..map[0].len()).collect(); y_iter = (0..map.len()).collect(); },
     }
+
+    // Make sure move is legal
+    println!("Making sure move is legal...");
+    for y in 0..map.len() {
+        for x in 0..map[0].len() {
+            if map[y][x] == '@' {
+                // Found moving rock pixel
+                let new_x = (x as isize + delta_x) as usize;
+                let new_y = (y as isize + delta_y) as usize;
+                if new_x >= map[0].len() || new_y >= map.len() {
+                    // Oh oh, hit the wall
+                    println!("Moving rock pixel at ({},{}) is going to collide into the wall at ({},{})",
+                        x, y, new_x, new_y);
+                    return false;
+                }
+                // Check pixel that it's going to move to is not rock
+                if map[new_y][new_x] == '#' {
+                    // Oh oh, found rock
+                    print!("Moving rock pixel at ({},{}) is going to collide into ({},{})",
+                        x, y, new_x, new_y);
+                    return false;
+                }
+                
+            }
+        }
+    }
+    println!("Move is legal.");
+
+    // If we get here, move is legal, it's move.
+    // Have to be careful moving, iterator must be in the direction as to not
+    // overwrite over moving pixels
+    for y in y_iter.clone() {
+        for x in x_iter.clone() {
+            if map[y][x] == '@' {
+                println!("Moving from ({},{}) to ({},{})", x, y, x as isize + delta_x, y as isize + delta_y);
+                map[y][x] = '.'; // Replace original location with nothing
+                map[(y as isize + delta_y) as usize][(x as isize + delta_x) as usize] = '@';
+            }
+        }
+    }
+
+
+    // If we get here, rock moved successfully!
+    return true;
 }
 
 fn print_map(map: &Vec<Vec<char>>) {
