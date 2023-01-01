@@ -26,11 +26,13 @@ pub fn run() {
     ]);
     rock_shapes.push(vec![vec!['#'], vec!['#'], vec!['#'], vec!['#']]);
     rock_shapes.push(vec![vec!['#', '#'], vec!['#', '#']]);
-    println!("rock_shapes={:#?}", rock_shapes);
 
-    let rock_tower_height = run_simulation(&rock_shapes, &jet_directions, 2022);
-    assert!(rock_tower_height == 3151);
-    println!("rock tower height = {}", rock_tower_height); 
+    let part1_rock_tower_height = run_simulation(&rock_shapes, &jet_directions, 2022);
+    assert!(part1_rock_tower_height == 3151);
+    println!("part 1: rock tower height = {}", part1_rock_tower_height); 
+    let part2_rock_tower_height = run_simulation(&rock_shapes, &jet_directions, 1_000_000_000_000);
+    assert!(part2_rock_tower_height == 1560919540245);
+    println!("part 2: rock tower height = {}", part2_rock_tower_height); 
 }
 
 fn run_simulation(rock_shapes: &Vec<Vec<Vec<char>>>, jet_directions: &String, num_rocks_to_stop: usize) -> usize {
@@ -45,8 +47,6 @@ fn run_simulation(rock_shapes: &Vec<Vec<Vec<char>>>, jet_directions: &String, nu
     let mut rock_index_to_insert = 0;
     let mut jet_index = 0;
 
-    let mut debug_count = 0;
-
     let mut need_new_rock = true;
     let mut num_fallen_rocks = 0;
 
@@ -60,8 +60,6 @@ fn run_simulation(rock_shapes: &Vec<Vec<Vec<char>>>, jet_directions: &String, nu
         if need_new_rock {
             // INSERT ROCK
             insert_new_rock(&mut map, &rock_shapes[rock_index_to_insert]);
-            // println!("Rock inserted. map=");
-            // print_map(&map);
             need_new_rock = false;
         }
 
@@ -73,22 +71,12 @@ fn run_simulation(rock_shapes: &Vec<Vec<Vec<char>>>, jet_directions: &String, nu
             // Go right
             move_rock(&mut map, Direction::Right);
         }
-        // println!(
-        //     "Finished jetting with {}. map=",
-        //     &jet_directions[jet_index..jet_index + 1]
-        // );
-        // print_map(&map);
 
         // MOVE ROCK DOWN
         let did_move_down = move_rock(&mut map, Direction::Down);
-        // println!("Finished moving rock down. map=");
-        // print_map(&map);
 
         if !did_move_down {
-            // println!("Rock could not move downward, solidying...");
             solidify_rock(&mut map);
-            // println!("Finished solidfying rock. map=");
-            // print_map(&map);
             println!("Solidfied rock num. {}.", num_fallen_rocks);
             num_fallen_rocks += 1;
             need_new_rock = true;
@@ -106,7 +94,6 @@ fn run_simulation(rock_shapes: &Vec<Vec<Vec<char>>>, jet_directions: &String, nu
                 let key = (rock_index_to_insert, jet_index);
                 if let Some((2, last_height, last_num_fallen_rocks)) = pattern_tracking.get(&key) {
                     // Found repeated pattern!
-                    println!("Found repeated pattern!");
                     let delta_height = tower_height - last_height;
                     let delta_piece_count = num_fallen_rocks - last_num_fallen_rocks;
                     let num_repeats = (num_rocks_to_stop - num_fallen_rocks) / delta_piece_count;
@@ -117,7 +104,9 @@ fn run_simulation(rock_shapes: &Vec<Vec<Vec<char>>>, jet_directions: &String, nu
                 pattern_tracking
                     .entry(key)
                     .and_modify(|(numer_times_seen, last_height, last_num_fallen_rocks)| {
-
+                        *numer_times_seen += 1;
+                        *last_height = tower_height;
+                        *last_num_fallen_rocks = num_fallen_rocks;
                     })
                     .or_insert((1, tower_height, num_fallen_rocks));
             }
@@ -131,11 +120,9 @@ fn run_simulation(rock_shapes: &Vec<Vec<Vec<char>>>, jet_directions: &String, nu
         }
 
         jet_index = (jet_index + 1) % jet_directions.len();
-
-        debug_count += 1;
     }
 
-    return tower_height;
+    return tower_height + height_added_by_patterns;
 
 }
 
@@ -148,7 +135,6 @@ fn insert_new_rock(map: &mut Vec<Vec<char>>, rock_to_insert: &Vec<Vec<char>>) {
         }
         highest_rock_row += 1;
     }
-    // println!("highest_rock_row={}", highest_rock_row);
 
     // Bottom left of rock goes 3 higher
     // Fill map with some more '.'
@@ -222,25 +208,16 @@ fn move_rock(map: &mut Vec<Vec<char>>, direction: Direction) -> bool {
                 // Don't need to check to y exceeding len() as bricks only ever move toward y=0
                 if new_x < 0 || new_x >= map[0].len() as isize || new_y < 0 {
                     // Oh oh, hit the wall
-                    // println!(
-                    //     "Moving rock pixel at ({},{}) is going to collide into the wall at ({},{})",
-                    //     x, y, new_x, new_y
-                    // );
                     return false;
                 }
                 // Check pixel that it's going to move to is not rock
                 if map[new_y as usize][new_x as usize] == '#' {
                     // Oh oh, found rock
-                    // print!(
-                    //     "Moving rock pixel at ({},{}) is going to collide into ({},{})",
-                    //     x, y, new_x, new_y
-                    // );
                     return false;
                 }
             }
         }
     }
-    // println!("Move is legal.");
 
     // If we get here, move is legal, it's move.
     // Have to be careful moving, iterator must be in the direction as to not
@@ -248,13 +225,6 @@ fn move_rock(map: &mut Vec<Vec<char>>, direction: Direction) -> bool {
     for y in y_iter.clone() {
         for x in x_iter.clone() {
             if map[y][x] == '@' {
-                // println!(
-                //     "Moving from ({},{}) to ({},{})",
-                //     x,
-                //     y,
-                //     x as isize + delta_x,
-                //     y as isize + delta_y
-                // );
                 map[y][x] = '.'; // Replace original location with nothing
                 map[(y as isize + delta_y) as usize][(x as isize + delta_x) as usize] = '@';
             }
