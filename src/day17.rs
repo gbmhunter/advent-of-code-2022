@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, collections::HashMap};
 
 const map_width: usize = 7;
 
@@ -28,6 +28,13 @@ pub fn run() {
     rock_shapes.push(vec![vec!['#', '#'], vec!['#', '#']]);
     println!("rock_shapes={:#?}", rock_shapes);
 
+    let rock_tower_height = run_simulation(&rock_shapes, &jet_directions, 2022);
+    assert!(rock_tower_height == 3151);
+    println!("rock tower height = {}", rock_tower_height); 
+}
+
+fn run_simulation(rock_shapes: &Vec<Vec<Vec<char>>>, jet_directions: &String, num_rocks_to_stop: usize) -> usize {
+
     // Map height is added to dynamically as needed
     // map[y][x]
     // y
@@ -43,12 +50,16 @@ pub fn run() {
     let mut need_new_rock = true;
     let mut num_fallen_rocks = 0;
 
+    let mut height_added_by_patterns = 0;
+    // (brick_index, jet_index), (number_times_seen, last_height, last_pieces_count)
+    let mut pattern_tracking: HashMap<(usize, usize), (usize, usize, usize)> = HashMap::new();
+
+    let mut tower_height = 0;
+
     loop {
         if need_new_rock {
             // INSERT ROCK
             insert_new_rock(&mut map, &rock_shapes[rock_index_to_insert]);
-            // Increment to next rock for next insertion
-            rock_index_to_insert = (rock_index_to_insert + 1) % rock_shapes.len();
             // println!("Rock inserted. map=");
             // print_map(&map);
             need_new_rock = false;
@@ -67,7 +78,6 @@ pub fn run() {
         //     &jet_directions[jet_index..jet_index + 1]
         // );
         // print_map(&map);
-        jet_index = (jet_index + 1) % jet_directions.len();
 
         // MOVE ROCK DOWN
         let did_move_down = move_rock(&mut map, Direction::Down);
@@ -82,20 +92,51 @@ pub fn run() {
             println!("Solidfied rock num. {}.", num_fallen_rocks);
             num_fallen_rocks += 1;
             need_new_rock = true;
+
+             // UPDATE HEIGHT
+            for y in tower_height..map.len() {
+                if !map[y].contains(&'#') {
+                    break;
+                }
+                tower_height += 1;
+            }
+
+            // Look for a repeated pattern
+            if height_added_by_patterns == 0 {
+                let key = (rock_index_to_insert, jet_index);
+                if let Some((2, last_height, last_num_fallen_rocks)) = pattern_tracking.get(&key) {
+                    // Found repeated pattern!
+                    println!("Found repeated pattern!");
+                    let delta_height = tower_height - last_height;
+                    let delta_piece_count = num_fallen_rocks - last_num_fallen_rocks;
+                    let num_repeats = (num_rocks_to_stop - num_fallen_rocks) / delta_piece_count;
+                    height_added_by_patterns = delta_height * num_repeats;
+                    num_fallen_rocks += delta_piece_count * num_repeats;
+                }
+
+                pattern_tracking
+                    .entry(key)
+                    .and_modify(|(numer_times_seen, last_height, last_num_fallen_rocks)| {
+
+                    })
+                    .or_insert((1, tower_height, num_fallen_rocks));
+            }
+
+            if num_fallen_rocks == num_rocks_to_stop {
+                break;
+            }
+
+            // Increment to next rock for next insertion
+            rock_index_to_insert = (rock_index_to_insert + 1) % rock_shapes.len();
         }
 
-        if num_fallen_rocks == 2022 {
-            break;
-        }
+        jet_index = (jet_index + 1) % jet_directions.len();
+
         debug_count += 1;
     }
 
-    // Now count how tall the tower of rocks is
-    let rock_tower_height = map.iter().filter(| &row | {
-        row.contains(&'#')
-    }).count();
-    assert!(rock_tower_height == 3151);
-    println!("rock tower height = {}", rock_tower_height);
+    return tower_height;
+
 }
 
 fn insert_new_rock(map: &mut Vec<Vec<char>>, rock_to_insert: &Vec<Vec<char>>) {
