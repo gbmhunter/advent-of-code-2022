@@ -40,10 +40,10 @@ pub fn run() {
     println!("data={:?}", room_data);
 
     // Filter out rooms that have 0 flow rate
-    let positive_flow_room_names: HashSet<_> = room_data.iter().filter(| (room_name, valve) | {
+    let positive_flow_room_names: HashSet<_> = room_data.iter().filter(| (_, valve) | {
             valve.flow_rate > 0
         })
-        .map(| (room_name, valve) | {
+        .map(| (room_name, _) | {
             room_name
         }).collect();
     println!("positive_flow_room_names={:?}", positive_flow_room_names);
@@ -70,8 +70,6 @@ fn part1(room_data: &HashMap<String, Valve>, positive_flow_room_names: &HashSet<
 
     // Keeps track of the max. pressure released from any state
     let mut max_pressure_released = 0u32;
-
-    let debug_valve_order: Vec<&str> = vec!["DD", "BB", "JJ", "HH", "EE", "CC" ];
 
     let mut count = 0;
     while let Some(curr_state) = states.pop_front() {

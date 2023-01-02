@@ -1,16 +1,14 @@
 use std::{fs, collections::HashMap};
 
-const map_width: usize = 7;
+const MAP_WIDTH: usize = 7;
 
-const starting_distance_left: usize = 2;
-const starting_distance_bottom: usize = 3;
+const STARTING_DISTANCE_LEFT: usize = 2;
+const STARTING_DISTANCE_BOTTOM: usize = 3;
 
 pub fn run() {
     println!("day17");
     let input = fs::read_to_string("src/day17.txt").unwrap();
     let jet_directions = input;
-
-    let num_of_rocks_to_stop = 2022;
 
     let mut rock_shapes: Vec<Vec<Vec<char>>> = Vec::new();
     rock_shapes.push(vec![vec!['#', '#', '#', '#']]);
@@ -138,10 +136,10 @@ fn insert_new_rock(map: &mut Vec<Vec<char>>, rock_to_insert: &Vec<Vec<char>>) {
 
     // Bottom left of rock goes 3 higher
     // Fill map with some more '.'
-    for _ in 0..(starting_distance_bottom + rock_to_insert.len()) {
-        map.push(vec!['.'; map_width]);
+    for _ in 0..(STARTING_DISTANCE_BOTTOM + rock_to_insert.len()) {
+        map.push(vec!['.'; MAP_WIDTH]);
     }
-    let map_insertion_height = highest_rock_row + starting_distance_bottom;
+    let map_insertion_height = highest_rock_row + STARTING_DISTANCE_BOTTOM;
 
     // We now have enough '.' in map to accomodate new rock, lets now copy across the '#'
     for y in 0..rock_to_insert.len() {
@@ -150,7 +148,7 @@ fn insert_new_rock(map: &mut Vec<Vec<char>>, rock_to_insert: &Vec<Vec<char>>) {
             if pixel_to_insert == '#' {
                 // Insert '@' to represent a rock which has not yet found it's resting place,
                 // i.e. rock in motion
-                map[map_insertion_height + y][starting_distance_left + x] = '@';
+                map[map_insertion_height + y][STARTING_DISTANCE_LEFT + x] = '@';
             }
         }
     }
@@ -166,10 +164,10 @@ enum Direction {
 
 fn move_rock(map: &mut Vec<Vec<char>>, direction: Direction) -> bool {
     // println!("move_rock() called. direction={:?}", direction);
-    let mut delta_x: isize = 0;
-    let mut delta_y: isize = 0;
-    let mut x_iter: Vec<usize>;
-    let mut y_iter: Vec<usize>;
+    let delta_x: isize;
+    let delta_y: isize;
+    let x_iter: Vec<usize>;
+    let y_iter: Vec<usize>;
     match direction {
         Direction::Left => {
             delta_x = -1;
@@ -203,8 +201,8 @@ fn move_rock(map: &mut Vec<Vec<char>>, direction: Direction) -> bool {
         for x in 0..map[0].len() {
             if map[y][x] == '@' {
                 // Found moving rock pixel
-                let new_x = (x as isize + delta_x);
-                let new_y = (y as isize + delta_y);
+                let new_x = x as isize + delta_x;
+                let new_y = y as isize + delta_y;
                 // Don't need to check to y exceeding len() as bricks only ever move toward y=0
                 if new_x < 0 || new_x >= map[0].len() as isize || new_y < 0 {
                     // Oh oh, hit the wall

@@ -1,4 +1,4 @@
-use std::{fs, collections::{HashMap, HashSet, VecDeque}};
+use std::{fs, collections::{HashSet, VecDeque}};
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 struct Coord(i32, i32, i32);
