@@ -5,17 +5,19 @@ use regex::Regex;
 #[derive(Debug)]
 struct Blueprint {
     // [ore, clay, obsidian, geode]
-    costs: [[u32; 4]; 4],
+    costs: [[i32; 4]; 4],
 }
 
 #[derive(Debug)]
 struct State {
-    elapsed_time: u32,
+    elapsed_time: i32,
     // [ore_robots, clay_robots, obsidian_robots, geode_robots]
-    num_robots: [u32; 4],
+    num_robots: [i32; 4],
     // [ore, clay, obsidian, geode]
-    num_resources: [u32; 4],
+    num_resources: [i32; 4],
 }
+
+const NUM_DAYS: i32 = 24;
 
 pub fn run() {
     println!("day19");
@@ -40,18 +42,18 @@ pub fn run() {
 
     while let Some(line) = lines.next() {
         // println!("{}", lines.next().unwrap());
-        let ore_robot_cost: u32 = ore_robot_regex.captures(
+        let ore_robot_cost: i32 = ore_robot_regex.captures(
                 line).
                 unwrap().get(1).unwrap().as_str().parse().unwrap();
-        let clay_robot_cost: u32 = clay_robot_regex.captures(
+        let clay_robot_cost: i32 = clay_robot_regex.captures(
                 line).
                 unwrap().get(1).unwrap().as_str().parse().unwrap();
         let captures = obsidian_robot_regex.captures(line).unwrap();
-        let obsidian_robot_cost_ore: u32 = captures.get(1).unwrap().as_str().parse().unwrap();
-        let obsidian_robot_cost_clay: u32 = captures.get(2).unwrap().as_str().parse().unwrap();
+        let obsidian_robot_cost_ore: i32 = captures.get(1).unwrap().as_str().parse().unwrap();
+        let obsidian_robot_cost_clay: i32 = captures.get(2).unwrap().as_str().parse().unwrap();
         let captures = geode_robot_regex.captures(line).unwrap();
-        let geode_robot_cost_ore: u32 = captures.get(1).unwrap().as_str().parse().unwrap();
-        let geode_robot_cost_obsidian: u32 = captures.get(2).unwrap().as_str().parse().unwrap();
+        let geode_robot_cost_ore: i32 = captures.get(1).unwrap().as_str().parse().unwrap();
+        let geode_robot_cost_obsidian: i32 = captures.get(2).unwrap().as_str().parse().unwrap();
 
         blueprints.push(Blueprint {
             costs: [
@@ -74,19 +76,78 @@ pub fn run() {
 
     let blueprint = &blueprints[0];
 
+    let mut debug_count = 0;
+
     while let Some(curr_state) = queue.pop() {
+        if debug_count == 5 {
+            break;
+        }
+        debug_count += 1;
         println!("Processing new state. state = {:?}", curr_state);
 
         // What can we build?
+        // Find the limiting resource (time wise) needed to make each robot (assuming we don't make
+        // any other robot in the mean time)
+        // 0mins = we can enough resources on hand to make it now
+        // >0 mins = make it in the future once more resources are gathered
+        // -1 = can't make it ever with current robots (i.e. we don't have even a single robot collecting
+        // that resource)
         // First robot is ore robot, then clay robot, e.t.c
-        for robot_costs in blueprint.costs {
-            let mut can_make_robot = true;
+        for (robot_idx, robot_costs) in blueprint.costs.iter().enumerate() {
+            let mut num_days_for_resource: [i32; 4] = [0; 4];
             for i in 0..robot_costs.len() {
-                if curr_state.num_resources[i] < robot_costs[i] {
-                    can_make_robot = false;
+                let remaining_to_collect = robot_costs[i] as i32 - curr_state.num_resources[i] as i32;
+                if robot_costs[i] == 0 || remaining_to_collect < 0 {
+                    num_days_for_resource[i] = 0;
+                } else if curr_state.num_robots[i] == 0 {
+                    // Oh oh, we don't have any of the robots required to gather this resource,
+                    // so we are never going to be able to make it
+                    num_days_for_resource[i] = i32::MAX;
+                } else {
+                    // Perform ceiling division
+                    num_days_for_resource[i] = 
+                        (remaining_to_collect + curr_state.num_robots[i] as i32 - 1) / curr_state.num_robots[i] as i32;
                 }
             }
-            println!("Can make robot? {}", can_make_robot);
+            println!("Num. days to make robot {} is {:?}", robot_idx, num_days_for_resource);
+            let num_days_to_get_all_resources = *num_days_for_resource.iter().max().unwrap();
+            println!("max days = {}", num_days_to_get_all_resources);
+
+            if num_days_to_get_all_resources == i32::MAX {
+                // Don't have the right robots to make the resources required for this robot,
+                // so give up trying to build one
+                println!("Don't have the right robots to make {}.", robot_idx);
+                continue;
+            }
+
+            // Make sure we can build one and it be useful before time runs out
+            // + 1 to include time to build robot
+            let time_to_advance_to = curr_state.elapsed_time + num_days_to_get_all_resources + 1;
+
+            if time_to_advance_to > NUM_DAYS {
+                println!("Making this robot would exceed max. runtime, so not building.");
+                continue;
+            }
+
+            let mut new_num_resources = [0; 4];
+            for (i, resource) in curr_state.num_resources.iter().enumerate() {
+                new_num_resources[i] = 
+                        resource
+                        - blueprint.costs[robot_idx][i] // Subtract of cost to build this new robot
+                        + curr_state.num_robots[i] * (num_days_to_get_all_resources + 1); // Add resource collected by existing robots
+            }
+
+            let mut new_num_robots = curr_state.num_robots.clone();
+            new_num_robots[robot_idx] += 1; // Add one for the robot we are just now making
+
+            // Make robot, advance time, create new state
+            let new_state = State {
+                elapsed_time: time_to_advance_to,
+                num_resources: new_num_resources,
+                num_robots: new_num_robots,
+            };
+            println!("Made new game state! state = {:?}", new_state);
+            queue.push(new_state);
         }
 
         // Collect resources from robots
