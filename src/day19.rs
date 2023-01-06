@@ -95,7 +95,26 @@ pub fn run() {
         // that resource)
         // First robot is ore robot, then clay robot, e.t.c
         for (robot_idx, robot_costs) in blueprint.costs.iter().enumerate() {
+
+            // For the resource this robot generates, find the max. amount required
+            // for any 1 minute to build any robot. If we already have enough of these
+            // robots to generate this max. amount, do not create any more
+            // (excl. geode robots, we always want these!)
+            let max_req_num_of_these_robots = blueprint.costs.iter().map(|resource| {
+                resource[robot_idx]
+            }).max().unwrap();
+
+            if robot_idx != 3 && curr_state.num_robots[robot_idx] >= max_req_num_of_these_robots {
+                // println!("Already have enough of these robots, not making any more! idx = {}, num robots = {}, max req. = {}",
+                //         robot_idx,
+                //         curr_state.num_robots[robot_idx],
+                //         max_req_num_of_these_robots);
+                continue;
+            }
+
+
             let mut num_days_for_resource: [i32; 4] = [0; 4];
+            // For each resource required for robot
             for i in 0..robot_costs.len() {
                 let remaining_to_collect = robot_costs[i] as i32 - curr_state.num_resources[i] as i32;
                 if robot_costs[i] == 0 || remaining_to_collect < 0 {
