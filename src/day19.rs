@@ -10,14 +10,14 @@ struct Blueprint {
 
 #[derive(Debug)]
 struct State {
-    elapsed_time: i32,
+    elapsed_time_mins: i32,
     // [ore_robots, clay_robots, obsidian_robots, geode_robots]
     num_robots: [i32; 4],
     // [ore, clay, obsidian, geode]
     num_resources: [i32; 4],
 }
 
-const NUM_DAYS: i32 = 24;
+const TOTAL_NUM_MINS: i32 = 24;
 
 pub fn run() {
     println!("day19");
@@ -39,6 +39,7 @@ pub fn run() {
     let geode_robot_regex = Regex::new("Each geode robot costs ([0-9]+) ore and ([0-9]+) obsidian.").unwrap();
 
     let mut blueprints: Vec<Blueprint> = Vec::new();
+    let mut max_num_geodes = 0;
 
     while let Some(line) = lines.next() {
         // println!("{}", lines.next().unwrap());
@@ -66,7 +67,7 @@ pub fn run() {
     println!("blueprints = {:?}", blueprints);
 
     let initial_state = State {
-        elapsed_time: 0,
+        elapsed_time_mins: 0,
         num_resources: [0, 0, 0, 0],
         num_robots: [1, 0, 0, 0],
     };
@@ -79,11 +80,11 @@ pub fn run() {
     let mut debug_count = 0;
 
     while let Some(curr_state) = queue.pop() {
-        if debug_count == 5 {
-            break;
+        if debug_count % 100000 == 0 {
+            println!("processing state num. {}, queue len = {}, max num. geodes = {}", debug_count, queue.len(), max_num_geodes);
         }
         debug_count += 1;
-        println!("Processing new state. state = {:?}", curr_state);
+        // println!("Processing new state. state = {:?}", curr_state);
 
         // What can we build?
         // Find the limiting resource (time wise) needed to make each robot (assuming we don't make
@@ -109,23 +110,23 @@ pub fn run() {
                         (remaining_to_collect + curr_state.num_robots[i] as i32 - 1) / curr_state.num_robots[i] as i32;
                 }
             }
-            println!("Num. days to make robot {} is {:?}", robot_idx, num_days_for_resource);
+            // println!("Num. days to make robot {} is {:?}", robot_idx, num_days_for_resource);
             let num_days_to_get_all_resources = *num_days_for_resource.iter().max().unwrap();
-            println!("max days = {}", num_days_to_get_all_resources);
+            // println!("max days = {}", num_days_to_get_all_resources);
 
             if num_days_to_get_all_resources == i32::MAX {
                 // Don't have the right robots to make the resources required for this robot,
                 // so give up trying to build one
-                println!("Don't have the right robots to make {}.", robot_idx);
+                // println!("Don't have the right robots to make {}.", robot_idx);
                 continue;
             }
 
             // Make sure we can build one and it be useful before time runs out
             // + 1 to include time to build robot
-            let time_to_advance_to = curr_state.elapsed_time + num_days_to_get_all_resources + 1;
+            let time_to_advance_to = curr_state.elapsed_time_mins + num_days_to_get_all_resources + 1;
 
-            if time_to_advance_to > NUM_DAYS {
-                println!("Making this robot would exceed max. runtime, so not building.");
+            if time_to_advance_to > TOTAL_NUM_MINS {
+                // println!("Making this robot would exceed max. runtime, so not building.");
                 continue;
             }
 
@@ -142,17 +143,24 @@ pub fn run() {
 
             // Make robot, advance time, create new state
             let new_state = State {
-                elapsed_time: time_to_advance_to,
+                elapsed_time_mins: time_to_advance_to,
                 num_resources: new_num_resources,
                 num_robots: new_num_robots,
             };
-            println!("Made new game state! state = {:?}", new_state);
+            // println!("Made new game state! state = {:?}", new_state);
             queue.push(new_state);
         }
 
-        // Collect resources from robots
+        // Run this state to completion to see how many geodes we get
+        let num_mins_remaining = TOTAL_NUM_MINS - curr_state.elapsed_time_mins;
+        assert!(num_mins_remaining >= 0);
+        let num_of_geodes = curr_state.num_resources[3] + curr_state.num_robots[3]*num_mins_remaining;
+        // println!("Num. geodes = {}", num_of_geodes);
+        // Update max. if relevant
+        max_num_geodes = max_num_geodes.max(num_of_geodes);
 
     }
+    println!("part 1: max. num geodes = {}", max_num_geodes);
 
     
 }
