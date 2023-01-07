@@ -17,7 +17,7 @@ struct State {
     num_resources: [i32; 4],
 }
 
-const TOTAL_NUM_MINS_PART1: i32 = 24;
+// const TOTAL_NUM_MINS_PART1: i32 = 24;
 
 pub fn run() {
     println!("day19");
@@ -66,6 +66,29 @@ pub fn run() {
     }
     println!("blueprints = {:?}", blueprints);
 
+    // PART 1 
+    let max_geodes_per_blueprint = find_max_geodes_per_blueprint(&blueprints, 24);
+    let sum_of_quality_levels: i32 = max_geodes_per_blueprint.iter().enumerate().map(|(idx, max_geodes)| {
+        // Remember elf's use start-from-1 indexing
+        ((idx as i32) + 1) * max_geodes
+    }).sum();
+    println!("part 1: sum of quality levels = {:?}", sum_of_quality_levels);
+    if use_example {
+        assert!(sum_of_quality_levels == 33);
+    } else {
+        assert!(sum_of_quality_levels == 1616);
+    }
+
+    // PART 2
+    let max_geodes_per_blueprint = find_max_geodes_per_blueprint(&blueprints[0..3], 32);
+    let product_of_max_geodes: i32 = max_geodes_per_blueprint.iter().product();
+    println!("part 2: product of max geodes = {:?}", product_of_max_geodes);
+    assert!(product_of_max_geodes == 8990);
+
+    
+}
+
+fn find_max_geodes_per_blueprint(blueprints: &[Blueprint], total_num_mins: i32) -> Vec<i32> {
     // let blueprint = &blueprints[0];
     let mut blueprint_max_geodes: Vec<i32> = Vec::new();
 
@@ -82,10 +105,10 @@ pub fn run() {
 
         blueprint_max_geodes.push(0);
 
-        let mut debug_count = 0;
+        let mut debug_count: i64 = 0;
 
         while let Some(curr_state) = queue.pop() {
-            if debug_count % 100000 == 0 {
+            if debug_count % 1000000 == 0 {
                 println!("processing state num. {}, queue len = {}, max num. geodes = {}", debug_count, queue.len(), blueprint_max_geodes[blueprint_idx]);
             }
             debug_count += 1;
@@ -117,6 +140,18 @@ pub fn run() {
                     continue;
                 }
 
+                // More pruning...check if the number of current geodes + what we could
+                // produce if we made a geode robot every minute would exceed the current
+                // max...if not let's bail early
+                let num_mins_remaining = total_num_mins - curr_state.elapsed_time_mins;
+                let potential_max_geodes = 
+                        curr_state.num_resources[3] // Existing num. of geos
+                        + curr_state.num_robots[3]*num_mins_remaining // Total geodes made from existing robots in remaining time
+                        + (num_mins_remaining*(num_mins_remaining + 1)) / 2; // Geodes made from new geode robots, 1 created per remaining min, 1 + 2 + 3 + ... = n(n+1)/2
+                if potential_max_geodes <= blueprint_max_geodes[blueprint_idx] {
+                    // println!("Current state cannot beat max, abandoning...");
+                    continue;
+                }
 
                 let mut num_days_for_resource: [i32; 4] = [0; 4];
                 // For each resource required for robot
@@ -149,7 +184,7 @@ pub fn run() {
                 // + 1 to include time to build robot
                 let time_to_advance_to = curr_state.elapsed_time_mins + num_days_to_get_all_resources + 1;
 
-                if time_to_advance_to > TOTAL_NUM_MINS_PART1 {
+                if time_to_advance_to > total_num_mins {
                     // println!("Making this robot would exceed max. runtime, so not building.");
                     continue;
                 }
@@ -176,7 +211,7 @@ pub fn run() {
             }
 
             // Run this state to completion to see how many geodes we get
-            let num_mins_remaining = TOTAL_NUM_MINS_PART1 - curr_state.elapsed_time_mins;
+            let num_mins_remaining = total_num_mins - curr_state.elapsed_time_mins;
             assert!(num_mins_remaining >= 0);
             let num_of_geodes = curr_state.num_resources[3] + curr_state.num_robots[3]*num_mins_remaining;
             // println!("Num. geodes = {}", num_of_geodes);
@@ -185,15 +220,5 @@ pub fn run() {
 
         }
     }
-    println!("{:?}", blueprint_max_geodes);
-    let sum_of_quality_levels: i32 = blueprint_max_geodes.iter().enumerate().map(|(idx, max_geodes)| {
-        // Remember elf's use start-from-1 indexing
-        ((idx as i32) + 1) * max_geodes
-    }).sum();
-    println!("part 1: sum of quality levels = {:?}", sum_of_quality_levels);
-    assert!(sum_of_quality_levels == 1616);
-
-    // PART 2
-
-    
+    blueprint_max_geodes
 }
