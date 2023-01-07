@@ -4,7 +4,7 @@ use indoc::indoc;
 
 pub fn run() {
     println!("day20");
-    let use_example = true;
+    let use_example = false;
 
     let input: String;
     if use_example {
@@ -38,10 +38,37 @@ pub fn run() {
         // Remove from mixed list
         mixed_list.remove(mixed_list_idx);
 
-        // Insert
+        // Insert back into list at moved location, wrapping as needed
         let new_mixed_list_idx = (mixed_list_idx as i64 + unmod_input).rem_euclid(mixed_list.len() as i64) as usize;
         mixed_list.insert(new_mixed_list_idx, unmod_input_idx);
     }
 
+    // Now we have to find the 0, there should be 1 of these in the original numbers
+    let unmod_input_0_idx = unmod_input
+        .iter()
+        .position(|&number| {
+            number == 0
+        }).unwrap();
+
+    // Find the position of the 0 in the mixed list
+    let mixed_list_0_idx = mixed_list
+        .iter()
+        .position(|&number| {
+            number == unmod_input_0_idx
+        }).unwrap();
+
+    let sum_of_grove_coordinates: i64 = [1000, 2000, 3000].iter().map(|num| {
+        let unmod_input_idx = mixed_list[(mixed_list_0_idx + num) % mixed_list.len()];
+        let number = unmod_input[unmod_input_idx];
+        println!("unmod_input_idx = {}, num = {}", unmod_input_idx, number);
+        number
+    }).sum();
+
+    println!("part 1: sum of grove coordinates = {}", sum_of_grove_coordinates);
+    if use_example {
+        assert!(sum_of_grove_coordinates == 3);
+    } else {
+        assert!(sum_of_grove_coordinates == 10831);
+    }
 
 }
